@@ -14,7 +14,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, language }) =
     <div className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col h-full transform transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
       <div className="relative">
         <img 
-          src={product.imageUrl} 
+          src={product.imageUrl || undefined}
           alt={product.productName} 
           className="w-full h-48 object-cover" 
           onError={(e) => { e.currentTarget.src = 'https://picsum.photos/300/300' }}
