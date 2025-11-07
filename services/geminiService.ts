@@ -2,70 +2,64 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { UserPreferences, Product } from '../types';
 import { Language } from '../App';
 
-// This type represents the product data we get from the initial text-based search.
-// It doesn't include an imageUrl because that will be generated separately.
 type ProductData = Omit<Product, 'imageUrl'>;
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
-/**
- * Generates a photorealistic product image.
- * The prompt is heavily optimized to prioritize creating an image that looks
- * exactly like the official product photo.
- */
-const generateProductImage = async (productName: string, brand: string): Promise<string> => {
-  const prompt = `Your **primary and non-negotiable directive** is to generate a photorealistic image that is an **exact, pixel-perfect replica** of a real K-beauty product's main official commercial photograph. The absolute highest priority is **100% accuracy** to the actual product's packaging, branding, and the specific image used for e-commerce listings.
+// 새로운 함수: Google Search를 통해 제품 이미지 URL을 검색
+// const searchProductImage = async (productName: string, brand: string): Promise<string> => {
+//   const searchPrompt = `Using Google Search, find the **direct image URL (ending in .jpg, .png, .jpeg, .gif, or .webp)** for the official product photo of "${productName}" by "${brand}" on Olive Young (올리브영) or other major Korean e-commerce websites.
+//   **Your response MUST be ONLY the image URL.** Do not include any other text, explanations, or markdown. If you cannot find a direct image URL, respond with "NO_IMAGE_FOUND".`;
 
-**Product to Replicate:**
-- **Product Name:** ${productName}
-- **Brand:** ${brand}
+//   try {
+//     const response = await ai.models.generateContent({
+//       model: 'gemini-2.5-pro',
+//       contents: {
+//         parts: [{ text: searchPrompt }],
+//       },
+//       config: {
+//           tools: [{ googleSearch: {} }],
+//           temperature: 0.2,
+//       },
+//     });
 
-**CRITICAL Execution Steps:**
-1.  **Internal Search & Identify:** Before generating, you must internally search for and identify the primary product photograph for this item as seen on its official brand website or major Korean retailers (like Olive Young). This is your reference image.
-2.  **Replicate, Do Not Interpret:** Your task is to replicate this reference image faithfully. This is not a creative task. Every single detail must be correct:
-    - **Text & Typography:** The exact font, size, weight, color, and placement of all text must be identical to the real product. All text must be sharp and perfectly legible.
-    - **Packaging:** The precise color, material (e.g., matte plastic, glossy glass), texture, and shape of the bottle, jar, or tube.
-    - **Cap & Dispenser:** The exact shape, color, and type of the cap or dispenser (e.g., pump, dropper, screw top).
-    - **Logos & Graphics:** All brand logos and graphical elements must be replicated perfectly.
+//     // --- 원활한 디버깅을 위해 이 로그는 잠시 유지해도 좋습니다 ---
+//     console.log(`[searchProductImage] Raw response for ${productName}:`, JSON.stringify(response, null, 2));
+//     // --- 로그 끝 ---
 
-**Photographic & Style Mandates:**
-- **Style:** Emulate a professional, high-resolution DSLR product photograph.
-- **Background:** Use a clean, seamless, studio-lit white or light-gray background, typical of e-commerce product photos.
-- **Lighting:** Bright, even, and neutral studio lighting that clearly shows all details without harsh shadows or artistic effects.
-
-**STRICTLY PROHIBITED (Automatic Failure Conditions):**
-- **Artistic Flair:** Absolutely no creative additions, props, dramatic lighting, or unique backgrounds.
-- **Generic Designs:** Do not generate a generic bottle with the product name on it. If you cannot find the exact packaging, it is better to indicate an error than to create a fabrication.
-- **Inaccuracies:** Any deviation in font, color, shape, or logo placement is a failure.
-- **3D Render Look:** Avoid glossy, unnatural reflections or textures that make the image look like a computer-generated render instead of a photograph.
-- **Blurry Text:** All text on the product must be perfectly crisp and readable.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: prompt }],
-      },
-      config: {
-          responseModalities: [Modality.IMAGE],
-      },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        const base64ImageBytes: string = part.inlineData.data;
-        // Return a data URL that can be used in an <img> src attribute
-        return `data:image/png;base64,${base64ImageBytes}`;
-      }
-    }
+//     let imageUrl = '';
+//     // 모델의 응답에서 'text' 부분을 직접 확인하여 URL을 추출합니다.
+//     if (response.candidates && response.candidates.length > 0 && 
+//         response.candidates[0].content && response.candidates[0].content.parts &&
+//         response.candidates[0].content.parts.length > 0 &&
+//         response.candidates[0].content.parts[0].text // 첫 번째 part의 text 필드에 URL이 있을 것으로 가정
+//     ) {
+//       const potentialUrl = response.candidates[0].content.parts[0].text.trim();
+      
+//       // 모델이 약속대로 URL만 반환했는지 확인 (http로 시작하고 이미지 확장자로 끝나는지)
+//       if (potentialUrl.startsWith('http') && 
+//           (potentialUrl.endsWith('.jpg') || potentialUrl.endsWith('.jpeg') || 
+//            potentialUrl.endsWith('.png') || potentialUrl.endsWith('.gif') || 
+//            potentialUrl.endsWith('.webp') || potentialUrl.includes('.jpg?') || // 쿼리 파라미터가 붙은 경우 대비
+//            potentialUrl.includes('.png?')) 
+//       ) {
+//         imageUrl = potentialUrl;
+//       }
+//     }
     
-    console.warn(`Could not generate an image for ${productName}.`);
-    return ''; // Return empty string, the UI will handle the fallback.
-  } catch (error) {
-    console.error(`Error generating image for ${productName}:`, error);
-    return ''; // Return empty string on error.
-  }
-};
+//     if (imageUrl && imageUrl !== "NO_IMAGE_FOUND") {
+//       console.log(`[searchProductImage] Found image URL for ${productName}: ${imageUrl}`);
+//       return imageUrl;
+//     } else {
+//       console.warn(`[searchProductImage] Could not find a suitable image URL for ${productName}. Final URL was: "${imageUrl}". Model did not return a valid image URL.`);
+//       return ''; // 빈 문자열 반환, UI에서 폴백 이미지 사용
+//     }
+//   } catch (error) {
+//     console.error(`[searchProductImage] Error searching for image for ${productName}:`, error);
+//     return ''; // 오류 발생 시 빈 문자열 반환
+//   }
+// };
+
 
 const getSystemInstruction = (preferences: UserPreferences, promptText: string, language: Language): string => {
   if (language === 'ko') {
@@ -87,10 +81,12 @@ const getSystemInstruction = (preferences: UserPreferences, promptText: string, 
 
     **중요 URL 요구사항**: 추천하는 각 제품에 대해, 제품의 공식 한글 이름을 찾아야 합니다. 그런 다음, 이커머스 웹사이트의 홈페이지에 해당 한글 제품 이름에 대한 검색 쿼리를 추가하여 \`productUrl\`을 구성해야 합니다.
     
-    예를 들어, 제품이 "Aestura Atobarrier365 Cream"이고 올리브영에서 찾았다면, 한글 이름은 "에스트라 아토베리어365 크림"입니다. 결과적인 \`productUrl\`은 "https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query=에스트라%20아토베리어365%20크림"이 되어야 합니다.
+    예를 들어, 제품이 "Aestura Atobarrier365 Cream"이고 올리브영에서 찾았다면, 한글 이름은 "에스트라 아토베리어365 크림". 결과적인 \`productUrl\`은 "https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query=에스트라%20아토베리어365%20크림"이 되어야 합니다.
     
+    **여기에 중요: "imageUrl" 필드를 포함하도록 시스템 지침을 수정합니다.**
+    **또한, 모델에게 가장 정확하고 직접적인 이미지 URL을 찾도록 명확하게 지시합니다.**
     당신의 전체 응답은 객체로 이루어진 단일하고 유효한 JSON 배열이어야 합니다. 다른 텍스트, 주석 또는 마크다운을 포함하지 마십시오.
-    각 객체는 "productName", "brand", "price"(숫자), "productUrl", "explanation" 속성을 가져야 합니다. "imageUrl" 속성은 포함하지 마십시오. 모든 텍스트 값은 한국어로 작성되어야 합니다.`;
+    각 객체는 "productName", "brand", "price"(숫자), "productUrl", "explanation", **"imageUrl"** (해당 제품의 **올리브영 또는 공식 웹사이트에서 찾은 직접적인 고해상도 제품 이미지 URL**이어야 합니다. Google Search Tool을 사용하여 이 URL을 찾으십시오.) 속성을 가져야 합니다. 모든 텍스트 값은 한국어로 작성되어야 합니다.`;
   }
 
   // Default to English
@@ -115,15 +111,10 @@ const getSystemInstruction = (preferences: UserPreferences, promptText: string, 
   For example, if the product is "Aestura Atobarrier365 Cream" and you find it on Olive Young, the Hangul name is "에스트라 아토베리어365 크림". The resulting \`productUrl\` MUST be "https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query=에스트라%20아토베리어365%20크림".
   
   Your entire response MUST be a single, valid JSON array of objects. Do not include any other text, commentary, or markdown.
-  Each object must have the following properties: "productName", "brand", "price" (as a number), "productUrl", "explanation". Do NOT include an "imageUrl" property.`;
+  Each object must have the following properties: "productName", "brand", "price" (as a number), "productUrl", "explanation", **"imageUrl"** (as a direct URL to the product image, which you MUST find using Google Search on Olive Young or the official brand site).`;
 };
 
 
-/**
- * Main function to get recommendations. This version uses a two-step process:
- * 1. Get text-based product recommendations (details, URLs, explanations).
- * 2. Generate a custom, photorealistic image for each recommended product.
- */
 export const getRecommendations = async (preferences: UserPreferences, promptText: string, language: Language): Promise<Product[]> => {
   const systemInstruction = getSystemInstruction(preferences, promptText, language);
 
@@ -133,13 +124,13 @@ export const getRecommendations = async (preferences: UserPreferences, promptTex
 
   let responseText = '';
   try {
-    // Step 1: Get product recommendations (text data only).
+    // Step 1: 텍스트 모델을 한 번만 호출하여 모든 정보 (imageUrl 포함)를 가져옵니다.
     const response = await ai.models.generateContent({
       model: "gemini-2.5-pro",
       contents: userInstruction,
       config: {
         systemInstruction,
-        tools: [{googleSearch: {}}],
+        tools: [{googleSearch: {}}], // 이미지 URL을 찾기 위해 여전히 Google Search Tool이 필요합니다.
         temperature: 0,
       },
     });
@@ -153,24 +144,16 @@ export const getRecommendations = async (preferences: UserPreferences, promptTex
     }
     
     const jsonString = jsonMatch[1] || jsonMatch[2];
-    const productsData: ProductData[] = JSON.parse(jsonString).slice(0, 5);
+    const finalProducts: Product[] = JSON.parse(jsonString).slice(0, 5); 
     
-    if (!Array.isArray(productsData) || productsData.length === 0) {
+    if (!Array.isArray(finalProducts) || finalProducts.length === 0) {
+        console.log("No product data received from text model.");
         return [];
     }
-
-    // Step 2: Generate an image for each product recommendation.
-    const productsWithImagesPromises = productsData.map(async (productData): Promise<Product> => {
-      const imageUrl = await generateProductImage(productData.productName, productData.brand);
-      return {
-        ...productData,
-        imageUrl: imageUrl,
-      };
-    });
-
-    // Step 3: Wait for all image generations to complete.
-    const finalProducts = await Promise.all(productsWithImagesPromises);
     
+    // 이제 각 제품 객체에는 이미 imageUrl이 포함되어 있을 것으로 기대합니다.
+    // 더 이상 추가적인 이미지 검색/생성 API 호출이 필요 없습니다.
+    console.log("Final products with image URLs:", finalProducts);
     return finalProducts;
 
   } catch (error) {
